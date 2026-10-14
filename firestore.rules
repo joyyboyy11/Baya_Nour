@@ -1,9 +1,20 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /products/{id} { allow read: if true; allow write: if request.auth != null; }
-    match /settings/{id} { allow read: if true; allow write: if request.auth != null; }
-    match /codes/{id}    { allow read: if true; allow write: if request.auth != null; }
-    match /orders/{id}   { allow create, get: if true; allow list, update, delete: if request.auth != null; }
+
+    // Vendeuse = uniquement le compte nour@admin.com (créé dans Authentication > Users).
+    function isAdmin() { return request.auth != null && request.auth.token.email == 'nour@admin.com'; }
+
+    match /products/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /settings/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /codes/{id}    { allow read: if true; allow write: if isAdmin(); }
+
+    // Les clients créent une commande (statut "nouvelle") et la consultent par son numéro.
+    match /orders/{id} {
+      allow create: if request.resource.data.status == 'nouvelle'
+                    && request.resource.data.keys().hasAll(['name','phone','addr','items','total','date']);
+      allow get: if true;
+      allow list, update, delete: if isAdmin();
+    }
   }
 }
