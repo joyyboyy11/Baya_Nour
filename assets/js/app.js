@@ -1,0 +1,182 @@
+
+const LIVE=!!CONFIG.apiKey&&typeof firebase!=="undefined";
+const CATS=["Classiques","De luxe","Personnalisés","Multicolores","Ensembles multi-rangs"];
+const STATUS=["nouvelle","confirmée","livrée","annulée"];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=n=>Number(n||0).toLocaleString("fr-FR")+" FCFA";
+const LS=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}};
+const toast=m=>{const t=$("#toast");t.textContent=m;t.style.display="block";setTimeout(()=>t.style.display="none",2200)};
+
+/* ====== Couche données : Firebase ou mode démo (localStorage) ====== */
+if(LIVE)firebase.initializeApp(CONFIG);
+const fdb=LIVE?firebase.firestore():null, auth=LIVE?firebase.auth():null;
+let user=LIVE?null:(sessionStorage.demoAdmin?{}:null);
+if(LIVE)auth.onAuthStateChanged(u=>{user=u;if(location.hash.startsWith("#/admin"))route()});
+const D={
+ async list(c){if(LIVE)return(await fdb.collection(c).get()).docs.map(d=>({...d.data(),id:d.id}));return LS(c,[])},
+ async get(c,id){if(LIVE){const x=await fdb.collection(c).doc(id).get();return x.exists?{...x.data(),id:x.id}:null}return LS(c,[]).find(x=>x.id==id)||null},
+ async save(c,o){o={...o};const id=o.id;delete o.id;
+  if(LIVE){if(id){await fdb.collection(c).doc(id).set(o);return id}return(await fdb.collection(c).add(o)).id}
+  const a=LS(c,[]),i=a.findIndex(x=>x.id==id);const nid=id||"i"+Date.now()+Math.random().toString(36).slice(2,6);
+  i<0?a.push({...o,id:nid}):a[i]={...o,id:nid};localStorage.setItem(c,JSON.stringify(a));return nid},
+ async del(c,id){if(LIVE)return fdb.collection(c).doc(id).delete();localStorage.setItem(c,JSON.stringify(LS(c,[]).filter(x=>x.id!=id)))}
+};
+const DEF={id:"shop",name:"Baya Élégance",slogan:"Sublime ta féminité",whatsapp:"221770000000",instagram:"https://instagram.com/",tiktok:"https://tiktok.com/",wave:"77 000 00 00",banner:"",
+ about:"Passionnée de baya depuis toujours, j'ai créé cette boutique pour offrir aux femmes sénégalaises des perles choisies avec soin, dans la tradition et avec une touche moderne.",
+ values:"Authenticité, qualité des perles, service attentionné, livraison soignée."};
+let P=[],S={...DEF},cart=LS("cart",[]),cat="Toutes",edit=null,tab="produits",orders=[],sel={},CODES=[],q="",sort="",fav=LS("fav",[]),promo=LS("promo",null);
+const saveCart=()=>{localStorage.setItem("cart",JSON.stringify(cart));renderChrome()};
+const pr=p=>p.promo>0&&p.promo<p.price?p.promo:p.price;
+const img=p=>(p.imgs&&p.imgs[0])?`<img class="ph" src="${esc(p.imgs[0])}" alt="${esc(p.name)}" loading="lazy">`:`<div class="ph" role="img" aria-label="${esc(p.name)}"></div>`;
+
+async function load(){
+ P=await D.list("products");
+ CODES=await D.list("codes");
+ const s=(await D.list("settings")).find(x=>x.id=="shop");S={...DEF,...(s||{}),id:"shop"};
+ if(!LIVE&&!P.length){const seed=[["Baya Royale Dorée","De luxe",35000,0,5,"Rouge,Or","Unique","Baya de luxe en perles de verre doré, finition soignée."],["Baya Classique Perle","Classiques",15000,12000,12,"Blanc,Rose","S,M,L","Le grand classique, léger et élégant."],["Baya Arc-en-ciel","Multicolores",18000,0,8,"Multicolore","M,L","Un festival de couleurs pour les grandes occasions."],["Baya Prénom","Personnalisés",25000,0,20,"Au choix","Sur mesure","Personnalisée avec ton prénom ou tes initiales."],["Ensemble 3 rangs","Ensembles multi-rangs",42000,38000,4,"Bordeaux,Or","Unique","Trois rangs assortis, effet somptueux."]];
+  for(const [i,a] of seed.entries())await D.save("products",{name:a[0],category:a[1],price:a[2],promo:a[3],stock:a[4],colors:a[5].split(","),sizes:a[6].split(","),desc:a[7],imgs:[],isNew:i<3,best:i%2==0});
+  P=await D.list("products");await D.save("codes",{code:"BIENVENUE",pct:10});CODES=await D.list("codes")}
+}
+const ICO={wa:"M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z",ig:"M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z",tt:"M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"};
+const floatSocial=()=>[["wa","WhatsApp","https://wa.me/"+S.whatsapp],["ig","Instagram",S.instagram],["tt","TikTok",S.tiktok]].filter(x=>x[2]).map(([k,n,u])=>`<a class="fb ${k}" href="${esc(u)}" target="_blank" rel="noopener" aria-label="${n}"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="${ICO[k]}"/></svg><span>${n}</span></a>`).join("");
+function renderChrome(){
+ const n=cart.reduce((a,l)=>a+l.qty,0),h=location.hash||"#/";
+ $("#logo").innerHTML=`<i></i>${esc(S.name)}`;
+ $("#nav").innerHTML=[["#/","Accueil"],["#/shop","Boutique"],["#/about","À propos"],["#/contact","Contact"],["#/fav","Favoris"+(fav.length?`<span class="cnt">${fav.length}</span>`:"")],["#/track","Suivi"],["#/cart",`Panier${n?`<span class="cnt">${n}</span>`:""}`]].map(([u,t])=>`<a href="${u}" class="${h==u?"on":""}">${t}</a>`).join("");
+ $("#foot").innerHTML=`<div class="beads"></div><div class="fg"><div><p class="logo"><i></i>${esc(S.name)}</p><p style="margin-top:.8rem">${esc(S.slogan)}. Des baya choisies avec soin, livrées partout au Sénégal.</p></div><div><h3>Boutique</h3><a href="#/shop">Tous les modèles</a><a href="#/about">À propos</a><a href="#/contact">Contact</a><a href="#/track">Suivi de commande</a></div><div><h3>Suivez-nous</h3><a href="https://wa.me/${esc(S.whatsapp)}">WhatsApp</a><a href="${esc(S.instagram)}">Instagram</a><a href="${esc(S.tiktok)}">TikTok</a></div></div><div class="mega" aria-hidden="true">${esc(S.name)}</div><p class="copy">© ${new Date().getFullYear()} ${esc(S.name)} - <a href="#/admin" style="display:inline">Espace vendeuse</a></p>`;
+ $("#fl").innerHTML=floatSocial();
+ $("#tabbar").innerHTML=[["#/","Accueil"],["#/shop","Boutique"],["#/fav","Favoris"+(fav.length?` (${fav.length})`:"")],["#/cart","Panier"+(n?` (${n})`:"")]].map(([u,t])=>`<a href="${u}" class="${h==u?"on":""}">${t}</a>`).join("");
+ document.title=S.name+", "+S.slogan;
+}
+const cardH=p=>`<a class="card" href="#/p/${p.id}">${p.promo>0?'<span class="tag">Promo</span>':p.isNew?'<span class="tag">Nouveau</span>':""}<button class="heart ${fav.includes(p.id)?"on":""}" data-act="fav" data-id="${p.id}" aria-label="Favori">&#9829;</button><div class="pic">${img(p)}<span class="qv">Voir le modèle</span></div><div class="b"><h3>${esc(p.name)}</h3><div class="price">${p.promo>0?`<s>${fmt(p.price)}</s>`:""}${fmt(pr(p))}</div>${p.stock<=0?'<small class="out">Épuisé</small>':""}</div></a>`;
+const sect=(t,l)=>l.length?`<section class="sec"><div class="sh"><h2>${t}</h2><a href="#/shop">Tout voir</a></div><div class="grid">${l.map(cardH).join("")}</div></section>`:"";
+
+const stp=n=>`<div class="stp">${["Panier","Livraison","Confirmation"].map((s,i)=>`<span class="${i<n?"d":i==n?"c":""}">${i+1}. ${s}</span>`).join("")}</div>`;
+const mq=()=>{const t=["Livraison partout au Sénégal","Paiement par Wave ou à la livraison","Baya artisanales","Sublime ta féminité"].map(x=>`<span>${x}</span>`).join("");return`<div class="mq" aria-hidden="true"><div>${t+t+t+t}</div></div>`};
+function beads(){const G=["g0","g1","g2","g3","g0","g3"];let o='<svg viewBox="0 0 1200 600" preserveAspectRatio="xMidYMax slice"><defs>'+[["g0","#fff3cf","#C9A45C","#5a3d12"],["g1","#ffffff","#d9ccb4","#8a7d66"],["g2","#e0788c","#8A2338","#2a0710"],["g3","#fff0c4","#E8CF94","#7a5c22"]].map(([i,a,b,c])=>`<radialGradient id="${i}" cx=".35" cy=".3"><stop offset="0" stop-color="${a}"/><stop offset=".5" stop-color="${b}"/><stop offset="1" stop-color="${c}"/></radialGradient>`).join("")+'</defs>';
+ [[440,34,0,1.15],[505,26,2.2,.9],[340,20,4,.55]].forEach(([b,a,ph,sc],k)=>{o+=`<g class="s s${k}" ${k==2?'opacity=".55"':""}>`;for(let i=0;i<=84;i++){const t=i/84,x=t*1200,y=b+a*Math.sin(t*Math.PI*3+ph)+k*t*30,r=(8+(i*7+k*3)%5)*sc*1.3;o+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="url(#${G[(i+k)%6]})"/><circle cx="${(x-r*.3).toFixed(1)}" cy="${(y-r*.35).toFixed(1)}" r="${(r*.26).toFixed(1)}" fill="#fff" opacity=".55"/>`}o+="</g>"});return o+"</svg>"}
+const shopList=()=>{let l=P.filter(p=>(cat=="Toutes"||p.category==cat)&&(!q||(p.name+" "+(p.desc||"")).toLowerCase().includes(q.toLowerCase())));if(sort)l=[...l].sort((a,b)=>sort=="asc"?pr(a)-pr(b):pr(b)-pr(a));return l.map(cardH).join("")||"<p>Aucun modèle trouvé.</p>"};
+const totals=()=>{const sub=cart.reduce((a,l)=>a+l.price*l.qty,0),disc=promo?Math.round(sub*promo.pct/100):0;return{sub,disc,total:sub-disc}};
+const V={
+ home:()=>`<div class="hero" style="${S.banner?`--bn:url('${esc(S.banner)}')`:""}"><div class="bd" aria-hidden="true">${beads()}</div><div class="in"><span class="orn" aria-hidden="true"></span><h1>${esc(S.slogan)}</h1><p>Baya artisanales, de la tradition à la haute couture.</p><a class="btn gold" href="#/shop">Découvrir la boutique</a></div><div class="beads"></div></div>${mq()}<div class="trust"><div><b>Livraison rapide</b>Partout au Sénégal</div><div><b>Paiement simple</b>Wave ou à la livraison</div><div><b>Perles sélectionnées</b>Qualité et finitions soignées</div><div><b>Service direct</b>Réponse sur WhatsApp</div></div>
+ <div class="wrap"><section><div class="sh"><h2>Nos collections</h2></div><div class="tiles">${CATS.map(c=>`<a class="tile" href="#/shop" data-act="cat" data-v="${c}"><span>${c}</span><small>${P.filter(p=>p.category==c).length} modèle(s)</small></a>`).join("")}</div></section>${sect("Nouveautés",P.filter(p=>p.isNew).slice(0,4))}${sect("Meilleures ventes",P.filter(p=>p.best).slice(0,4))}${sect("Promotions",P.filter(p=>p.promo>0).slice(0,4))}</div>`,
+ shop:()=>`<div class="wrap"><h2>Notre boutique</h2><div class="tools"><input id="q" type="search" placeholder="Rechercher un baya" value="${esc(q)}" aria-label="Rechercher"><select id="sort" aria-label="Trier"><option value="">Trier par</option><option value="asc" ${sort=="asc"?"selected":""}>Prix croissant</option><option value="desc" ${sort=="desc"?"selected":""}>Prix décroissant</option></select></div><div class="chips" style="margin-top:1rem">${["Toutes",...CATS].map(c=>`<button class="chip ${c==cat?"on":""}" data-act="cat" data-v="${c}">${c}</button>`).join("")}</div><div id="sg" class="grid">${shopList()}</div></div>`,
+ product:id=>{const p=P.find(x=>x.id==id);if(!p)return`<div class="wrap"><p>Produit introuvable. <a href="#/shop"><u>Retour à la boutique</u></a></p></div>`;
+  sel[id]=sel[id]||{color:(p.colors||[])[0],size:(p.sizes||[])[0],qty:1,main:0};const s=sel[id],im=p.imgs||[],off=p.promo>0?Math.round(100-p.promo*100/p.price):0,rel=P.filter(x=>x.category==p.category&&x.id!=id).slice(0,4);
+  const opt=(k,l)=>`<div class="opts">${(l||[]).map(v=>`<button class="opt ${s[k]==v?"on":""}" data-act="opt" data-id="${id}" data-k="${k}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>`;
+  return`<div class="wrap two pdp"><div><div class="zoom" data-act="lb">${im.length?`<img class="ph" src="${esc(im[s.main]||im[0])}" alt="${esc(p.name)}">`:img(p)}</div><div class="th">${im.map((u,i)=>`<img src="${esc(u)}" alt="" data-act="main" data-id="${id}" data-v="${i}">`).join("")}</div></div>
+  <div class="info"><a href="#/shop" class="mut">${esc(p.category)}</a><h2>${esc(p.name)}</h2><p class="price big" style="margin:.5rem 0">${p.promo>0?`<s>${fmt(p.price)}</s>`:""}${fmt(pr(p))}${off?`<span class="off">-${off}%</span>`:""}</p><p>${esc(p.desc)}</p>${p.stock<=0?'<p class="low">Épuisé</p>':p.stock<=3?`<p class="low">Plus que ${p.stock} en stock</p>`:""}
+  <label>Couleur</label>${opt("color",p.colors)}<label>Taille</label>${opt("size",p.sizes)}
+  <label>Quantité</label><div class="qty"><button data-act="q" data-id="${id}" data-v="-1">-</button> <b>${s.qty}</b> <button data-act="q" data-id="${id}" data-v="1">+</button></div>
+  <div class="cta"><button class="btn ghost" data-act="add" data-id="${id}" ${p.stock<=0?"disabled":""}>Ajouter au panier</button><button class="btn" data-act="buy" data-id="${id}" ${p.stock<=0?"disabled":""}>Commander maintenant</button><button class="heart on-wrap ${fav.includes(id)?"on":""}" style="position:static" data-act="fav" data-id="${id}" aria-label="Favori">&#9829;</button></div>
+  <details class="acc"><summary>Entretien</summary><p>Évite le contact prolongé avec l'eau, les parfums et les crèmes. Range tes baya à plat, à l'abri de l'humidité.</p></details><details class="acc"><summary>Livraison et paiement</summary><p>Livraison partout au Sénégal. Paiement par Wave ou à la livraison. Nous t'appelons pour confirmer.</p></details><p style="margin-top:1.2rem"><a href="https://wa.me/${esc(S.whatsapp)}"><u>Une question ? Écris-nous sur WhatsApp</u></a></p></div></div>${rel.length?`<div class="wrap" style="padding-top:0">${sect("Vous aimerez aussi",rel)}</div>`:""}`},
+ cart:()=>{if(!cart.length)return`<div class="wrap"><h2>Votre panier</h2><p style="margin:1rem 0">Votre panier est vide.</p><a class="btn" href="#/shop">Voir la boutique</a></div>`;const T=totals();
+  return`<div class="wrap"><h2>Votre panier</h2>${stp(0)}<div class="tw box"><table>${cart.map((l,i)=>`<tr><td><b>${esc(l.name)}</b><br><small>${esc(l.color||"")} ${esc(l.size||"")}</small></td><td>${fmt(l.price)}</td><td class="qty"><button data-act="cq" data-i="${i}" data-v="-1">-</button> ${l.qty} <button data-act="cq" data-i="${i}" data-v="1">+</button></td><td>${fmt(l.price*l.qty)}</td><td><button class="btn sm ghost" data-act="rm" data-i="${i}">Retirer</button></td></tr>`).join("")}</table></div>
+  <div class="two cartbot"><div class="box"><label for="pc" style="margin-top:0">Code promo</label>${promo?`<p>Code <b>${esc(promo.code)}</b> appliqué (-${promo.pct}%) <button class="btn sm ghost" data-act="nopromo">Retirer</button></p>`:`<div style="display:flex;gap:.6rem"><input id="pc" placeholder="Ex. BIENVENUE"><button class="btn" data-act="promo">Appliquer</button></div>`}</div>
+  <div class="box"><p class="row"><span>Sous-total</span>${fmt(T.sub)}</p>${T.disc?`<p class="row"><span>Réduction</span>-${fmt(T.disc)}</p>`:""}<h3 class="row"><span>Total</span>${fmt(T.total)}</h3><a class="btn" style="margin-top:1rem" href="#/checkout">Passer la commande</a></div></div></div>`},
+ checkout:()=>{if(!cart.length)return V.cart();const T=totals();
+  return`<div class="wrap" style="max-width:640px"><h2>Finaliser la commande</h2>${stp(1)}<form id="of" class="box"><label>Nom complet</label><input name="name" required><label>Téléphone</label><input name="phone" type="tel" required><label>Adresse ou lieu de livraison</label><textarea name="addr" rows="2" required></textarea>
+  <label>Paiement</label><label style="font-weight:400"><input type="radio" name="pay" value="Wave" checked>Wave</label><label style="font-weight:400"><input type="radio" name="pay" value="Paiement à la livraison">Paiement à la livraison</label>
+  <p style="margin:1.2rem 0">${T.disc?`Réduction : -${fmt(T.disc)}<br>`:""}<b>Total : ${fmt(T.total)}</b></p><button class="btn" type="submit">Confirmer la commande</button></form></div>`},
+ confirm:id=>{const o=LS("last",{});return`<div class="wrap" style="max-width:640px;text-align:center"><h2>Merci ${esc(o.name||"")}, commande reçue !</h2>${stp(2)}<div class="box"><p>Référence à conserver</p><p><b class="ref">${esc(id)}</b></p><p style="margin-top:.8rem">Total : <b>${fmt(o.total)}</b></p>${o.pay=="Wave"?`<p style="margin-top:1rem">Envoie le montant par Wave au <b>${esc(S.wave)}</b> en précisant ta référence.</p>`:`<p style="margin-top:1rem">Tu paieras à la livraison.</p>`}<p style="margin:1rem 0">Nous t'appelons très vite pour confirmer la livraison.</p><div style="display:flex;gap:.7rem;justify-content:center;flex-wrap:wrap"><a class="btn" href="#/track/${encodeURIComponent(id)}">Suivre ma commande</a><a class="btn gold" href="https://wa.me/${esc(S.whatsapp)}?text=${encodeURIComponent("Bonjour, ma commande "+id)}">Écrire sur WhatsApp</a></div></div></div>`},
+ fav:()=>`<div class="wrap"><h2>Mes favoris</h2>${fav.length?`<div class="grid">${P.filter(p=>fav.includes(p.id)).map(cardH).join("")}</div>`:`<p style="margin:1rem 0">Aucun favori pour le moment. Touche le coeur sur un modèle pour l'ajouter.</p>`}</div>`,
+ track:async id=>{if(!id)return`<div class="wrap" style="max-width:560px"><h2>Suivi de commande</h2><form id="tf" class="box"><label for="rf" style="margin-top:0">Référence de commande</label><input id="rf" name="r" required><button class="btn" style="margin-top:1rem">Suivre</button></form></div>`;
+  let o=null;try{o=await D.get("orders",id)}catch(e){}
+  if(!o)return`<div class="wrap"><h2>Commande introuvable</h2><p style="margin:1rem 0">Vérifie la référence reçue après ta commande.</p><a class="btn" href="#/track">Réessayer</a></div>`;
+  const st=["nouvelle","confirmée","livrée"],i=st.indexOf(o.status);
+  return`<div class="wrap" style="max-width:700px"><h2>Suivi de commande</h2><div class="box">${o.status=="annulée"?'<p class="low">Cette commande a été annulée.</p>':`<div class="steps">${st.map((s,k)=>`<div class="${k<=i?"done":""}"><span></span>${["Reçue","Confirmée","Livrée"][k]}</div>`).join("")}</div>`}<p style="margin-top:1.2rem">${o.items.map(x=>`${x.qty} x ${esc(x.name)}`).join("<br>")}</p><p><b>Total : ${fmt(o.total)}</b> (${esc(o.pay)})</p><a class="btn ghost" style="margin-top:1rem" href="https://wa.me/${esc(S.whatsapp)}?text=${encodeURIComponent("Bonjour, au sujet de ma commande "+id)}">Modifier ou annuler via WhatsApp</a></div></div>`},
+ about:()=>`<div class="wrap" style="max-width:760px"><h2>À propos</h2><div class="box"><h3>Notre histoire</h3><p>${esc(S.about)}</p><h3 style="margin-top:1.2rem">Nos valeurs</h3><p>${esc(S.values)}</p></div></div>`,
+ contact:()=>`<div class="wrap two"><div><h2>Contact</h2><p style="margin:1rem 0">Une question sur un modèle, un prix ou une livraison ? Écris-nous.</p><p><a href="https://wa.me/${esc(S.whatsapp)}"><u>WhatsApp</u></a> / <a href="${esc(S.instagram)}"><u>Instagram</u></a> / <a href="${esc(S.tiktok)}"><u>TikTok</u></a></p></div>
+  <form id="cf" class="box" style="margin:0"><label>Votre nom</label><input name="n" required><label>Votre message</label><textarea name="m" rows="4" required></textarea><button class="btn" style="margin-top:1rem">Envoyer sur WhatsApp</button></form></div>`
+};
+
+/* ====== Administration ====== */
+function pf(p){p=p||{};return`<form id="pf" class="box"><h3>${p.id?"Modifier":"Ajouter"} un baya</h3><div class="two" style="gap:1.5rem"><div><label>Nom</label><input name="name" required value="${esc(p.name)}"><label>Catégorie</label><select name="category">${CATS.map(c=>`<option ${p.category==c?"selected":""}>${c}</option>`).join("")}</select><label>Prix (FCFA)</label><input name="price" type="number" min="0" required value="${p.price||""}"><label>Prix promo (0 = aucune)</label><input name="promo" type="number" min="0" value="${p.promo||0}"><label>Stock</label><input name="stock" type="number" min="0" value="${p.stock??1}"></div>
+ <div><label>Couleurs (séparées par des virgules)</label><input name="colors" value="${esc((p.colors||[]).join(", "))}"><label>Tailles (séparées par des virgules)</label><input name="sizes" value="${esc((p.sizes||[]).join(", "))}"><label>Description</label><textarea name="desc" rows="3">${esc(p.desc)}</textarea><label>Photos (jusqu'à 3)</label><input type="file" id="files" accept="image/*" multiple><small id="fl">${(p.imgs||[]).length} photo(s) enregistrée(s)</small><label><input type="checkbox" name="isNew" ${p.isNew?"checked":""}>Nouveauté</label><label><input type="checkbox" name="best" ${p.best?"checked":""}>Meilleure vente</label></div></div><div style="margin-top:1rem;display:flex;gap:.6rem"><button class="btn">Enregistrer</button><button type="button" class="btn ghost" data-act="cancel">Annuler</button></div></form>`}
+const shrink=f=>new Promise(r=>{const i=new Image,u=URL.createObjectURL(f);i.onload=()=>{const k=Math.min(1,800/Math.max(i.width,i.height)),c=document.createElement("canvas");c.width=i.width*k;c.height=i.height*k;c.getContext("2d").drawImage(i,0,0,c.width,c.height);r(c.toDataURL("image/jpeg",.78))};i.src=u});
+const admin=async()=>{
+ if(!user)return`<div class="wrap" style="max-width:420px"><h2>Espace vendeuse</h2><form id="lf" class="box">${LIVE?`<label>Email</label><input name="e" type="email" required>`:`<small>Mode démo : mot de passe admin123</small>`}<label>Mot de passe</label><input name="p" type="password" required><button class="btn" style="margin-top:1rem">Se connecter</button></form></div>`;
+ orders=(await D.list("orders")).sort((a,b)=>b.date.localeCompare(a.date));
+ const tabs=["produits","commandes","ventes","codes","boutique"],ok=orders.filter(o=>o.status!="annulée"),ca=ok.reduce((a,o)=>a+o.total,0);
+ let body="";
+ if(tab=="produits")body=(edit!==null?pf(edit):`<div class="row" style="margin-top:1rem"><h3>${P.length} produits</h3><button class="btn" data-act="new">Ajouter un baya</button></div>`)+`<div class="tw box"><table><tr><th>Nom</th><th>Prix</th><th>Promo</th><th>Stock</th><th></th></tr>${P.map(p=>`<tr><td>${esc(p.name)}</td><td>${fmt(p.price)}</td><td>${p.promo>0?fmt(p.promo):"-"}</td><td>${p.stock}</td><td><button class="btn sm ghost" data-act="edit" data-id="${p.id}">Modifier</button> <button class="btn sm ghost" data-act="del" data-id="${p.id}">Supprimer</button></td></tr>`).join("")}</table></div>`;
+ if(tab=="commandes")body=`<div class="row" style="margin-top:1rem"><h3>${orders.length} commandes</h3><button class="btn sm" data-act="csv">Exporter en CSV</button></div><div class="tw box"><table><tr><th>Date</th><th>Cliente</th><th>Articles</th><th>Total</th><th>Statut</th></tr>${orders.map(o=>`<tr><td>${new Date(o.date).toLocaleDateString("fr-FR")}</td><td>${esc(o.name)}<br><small>${esc(o.phone)} - ${esc(o.addr)}<br>${esc(o.pay)}</small></td><td>${o.items.map(i=>`${i.qty}x ${esc(i.name)} ${esc(i.color||"")}`).join("<br>")}</td><td>${fmt(o.total)}${o.code?`<br><small>Code ${esc(o.code)}</small>`:""}</td><td><select data-act="st" data-id="${o.id}">${STATUS.map(s=>`<option ${o.status==s?"selected":""}>${s}</option>`).join("")}</select></td></tr>`).join("")||"<tr><td>Aucune commande pour le moment.</td></tr>"}</table></div>`;
+ if(tab=="ventes"){const m={};ok.forEach(o=>o.items.forEach(i=>m[i.name]=(m[i.name]||0)+i.qty));const top=Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const days=[...Array(7)].map((_,i)=>{const x=new Date();x.setDate(x.getDate()-6+i);return x.toISOString().slice(0,10)}),vals=days.map(x=>ok.filter(o=>o.date.slice(0,10)==x).reduce((a,o)=>a+o.total,0)),mx=Math.max(...vals,1);
+  body=`<div class="stats" style="margin-top:1rem"><div class="box"><b>${fmt(ca)}</b>Chiffre d'affaires</div><div class="box"><b>${ok.length}</b>Commandes valides</div><div class="box"><b>${fmt(ok.length?Math.round(ca/ok.length):0)}</b>Panier moyen</div><div class="box"><b>${orders.filter(o=>o.status=="nouvelle").length}</b>À traiter</div></div>
+  <div class="box"><h3>Ventes des 7 derniers jours</h3><svg viewBox="0 0 420 160" role="img" aria-label="Ventes par jour" style="width:100%;max-width:600px">${vals.map((v,i)=>{const h=Math.round(v/mx*100),x=18+i*57;return`<rect x="${x}" y="${125-h}" width="40" height="${h}" rx="5" fill="#B8923A"/><text x="${x+20}" y="145" font-size="11" text-anchor="middle" fill="#A09483">${days[i].slice(8)}/${days[i].slice(5,7)}</text>${v?`<text x="${x+20}" y="${120-h}" font-size="10" text-anchor="middle" fill="#EBD49B">${Math.round(v/1000)}k</text>`:""}`}).join("")}</svg></div>
+  <div class="two"><div class="box"><h3>Modèles les plus vendus</h3>${top.map(t=>`<p>${esc(t[0])} : ${t[1]}</p>`).join("")||"<p>Pas encore de ventes.</p>"}</div><div class="box"><h3>Stock à surveiller</h3>${P.filter(p=>p.stock<=2).map(p=>`<p>${esc(p.name)} : ${p.stock}</p>`).join("")||"<p>Tout est bien approvisionné.</p>"}</div></div>`}
+ if(tab=="codes")body=`<form id="cdf" class="box row" style="align-items:flex-end"><div><label style="margin-top:0">Code</label><input name="code" required placeholder="BIENVENUE"></div><div><label style="margin-top:0">Réduction (%)</label><input name="pct" type="number" min="1" max="90" required></div><button class="btn">Créer le code</button></form><div class="tw box"><table><tr><th>Code</th><th>Réduction</th><th></th></tr>${CODES.map(c=>`<tr><td>${esc(c.code)}</td><td>${c.pct}%</td><td><button class="btn sm ghost" data-act="delcode" data-id="${c.id}">Supprimer</button></td></tr>`).join("")||"<tr><td>Aucun code.</td></tr>"}</table></div>`;
+ if(tab=="boutique")body=`<form id="sf" class="box">${[["name","Nom de la boutique"],["slogan","Slogan"],["whatsapp","WhatsApp (ex. 221770000000)"],["instagram","Lien Instagram"],["tiktok","Lien TikTok"],["wave","Numéro Wave"]].map(([k,l])=>`<label>${l}</label><input name="${k}" value="${esc(S[k])}">`).join("")}<label>Histoire</label><textarea name="about" rows="3">${esc(S.about)}</textarea><label>Valeurs</label><textarea name="values" rows="2">${esc(S.values)}</textarea><label>Photo de bannière</label><input type="file" id="bf" accept="image/*"><button class="btn" style="margin-top:1rem">Enregistrer</button></form>`;
+ return`<div class="wrap"><div class="row"><h2>Espace vendeuse</h2><button class="btn sm ghost" data-act="out">Se déconnecter</button></div><div class="chips" style="margin-top:1rem">${tabs.map(t=>`<button class="chip ${t==tab?"on":""}" data-act="tab" data-v="${t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join("")}</div>${body}</div>`};
+
+/* ====== Routeur ====== */
+function reveal(){if(!("IntersectionObserver" in window)||(window.matchMedia&&matchMedia("(prefers-reduced-motion:reduce)").matches))return;
+ const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){const t=e.target;t.classList.add("on");io.unobserve(t);setTimeout(()=>{t.classList.remove("rv","on");t.style.transitionDelay=""},900)}}),{threshold:.1});
+ document.querySelectorAll("#app .card,#app .tile,#app .sh,#app .trust div").forEach((el,i)=>{el.style.transitionDelay=(i%4)*70+"ms";el.classList.add("rv");io.observe(el)})}
+document.addEventListener("mousemove",e=>{const h=e.target.closest&&e.target.closest(".hero");if(h){const r=h.getBoundingClientRect();h.style.setProperty("--mx",e.clientX-r.left+"px");h.style.setProperty("--my",e.clientY-r.top+"px")}});
+addEventListener("scroll",()=>{const d=document.documentElement;document.querySelector("header").style.setProperty("--p",(d.scrollTop/((d.scrollHeight-d.clientHeight)||1)*100)+"%")},{passive:true});
+async function route(){
+ const h=location.hash||"#/",[,r,a]=h.split("/");let html;
+ try{
+  if(r==="shop")html=V.shop();else if(r==="p")html=V.product(a);else if(r==="cart")html=V.cart();else if(r==="checkout")html=V.checkout();
+  else if(r==="confirm")html=V.confirm(a);else if(r==="track")html=await V.track(a&&decodeURIComponent(a));else if(r==="fav")html=V.fav();else if(r==="about")html=V.about();else if(r==="contact")html=V.contact();else if(r==="admin")html=await admin();else html=V.home();
+ }catch(e){html=`<div class="wrap"><p>Une erreur est survenue : ${esc(e.message)}. Recharge la page.</p></div>`}
+ $("#app").innerHTML=html;renderChrome();reveal();if(r!=="admin")window.scrollTo(0,0);
+}
+addEventListener("hashchange",route);
+const L=(id,p,s)=>({id:p.id,name:p.name,price:pr(p),color:s.color,size:s.size,qty:s.qty});
+function addToCart(id){const p=P.find(x=>x.id==id),s=sel[id],inC=cart.filter(x=>x.id==id).reduce((a,l)=>a+l.qty,0);if(inC+s.qty>p.stock){toast("Stock disponible : "+p.stock);return false}const l=cart.find(x=>x.id==id&&x.color==s.color&&x.size==s.size);l?l.qty+=s.qty:cart.push(L(id,p,s));saveCart();return true}
+
+document.addEventListener("click",async e=>{
+ const t=e.target.closest("[data-act]");if(!t||t.tagName=="SELECT")return;const a=t.dataset.act,id=t.dataset.id,v=t.dataset.v;
+ if(a=="cat"){cat=v;route()}
+ else if(a=="opt"){sel[id][t.dataset.k]=v;route()}
+ else if(a=="main"){sel[id].main=+v;route()}
+ else if(a=="q"){sel[id].qty=Math.min(Math.max(1,P.find(x=>x.id==id).stock),Math.max(1,sel[id].qty+ +v));route()}
+ else if(a=="add"){addToCart(id)&&toast("Ajouté au panier")}
+ else if(a=="buy"){if(addToCart(id))location.hash="#/checkout"}
+ else if(a=="cq"){const l=cart[t.dataset.i];l.qty=Math.min((P.find(x=>x.id==l.id)||{stock:99}).stock,Math.max(1,l.qty+ +v));saveCart();route()}
+ else if(a=="rm"){cart.splice(t.dataset.i,1);saveCart();route()}
+ else if(a=="fav"){e.preventDefault();fav=fav.includes(id)?fav.filter(x=>x!=id):[...fav,id];localStorage.setItem("fav",JSON.stringify(fav));document.querySelectorAll(`[data-act=fav][data-id="${id}"]`).forEach(b=>b.classList.toggle("on",fav.includes(id)));renderChrome()}
+ else if(a=="lb"){const im=t.querySelector("img");if(im){const x=document.createElement("div");x.className="lbx";x.innerHTML=`<img src="${im.src}" alt="">`;x.onclick=()=>x.remove();document.body.appendChild(x)}}
+ else if(a=="promo"){const c=CODES.find(x=>x.code==$("#pc").value.trim().toUpperCase());if(!c){toast("Code invalide");return}promo={code:c.code,pct:c.pct};localStorage.setItem("promo",JSON.stringify(promo));route()}
+ else if(a=="nopromo"){promo=null;localStorage.removeItem("promo");route()}
+ else if(a=="delcode"){await D.del("codes",id);CODES=await D.list("codes");route()}
+ else if(a=="csv"){const c2=x=>'"'+String(x??"").replace(/"/g,'""')+'"',rows=[["Date","Référence","Nom","Téléphone","Adresse","Paiement","Articles","Code","Remise","Total","Statut"],...orders.map(o=>[o.date.slice(0,10),o.id,o.name,o.phone,o.addr,o.pay,o.items.map(i=>i.qty+"x "+i.name+" "+(i.color||"")).join(" | "),o.code||"",o.discount||0,o.total,o.status])],u=URL.createObjectURL(new Blob(["\ufeff"+rows.map(r=>r.map(c2).join(";")).join("\n")],{type:"text/csv"})),l=document.createElement("a");l.href=u;l.download="commandes.csv";l.click();URL.revokeObjectURL(u)}
+ else if(a=="tab"){tab=v;edit=null;route()}
+ else if(a=="new"){edit={};route()}
+ else if(a=="edit"){edit=P.find(p=>p.id==id);route()}
+ else if(a=="cancel"){edit=null;route()}
+ else if(a=="del"){if(confirm("Supprimer ce produit ?")){await D.del("products",id);P=await D.list("products");route()}}
+ else if(a=="out"){LIVE?await auth.signOut():sessionStorage.removeItem("demoAdmin");user=null;route()}
+});
+document.addEventListener("change",async e=>{
+ if(e.target.dataset.act=="st"){const o=orders.find(x=>x.id==e.target.dataset.id),ns=e.target.value;
+  const rs=x=>x=="confirmée"||x=="livrée",adj=async g=>{for(const i of o.items){const p=P.find(x=>x.id==i.id);if(p){p.stock=Math.max(0,p.stock+g*i.qty);await D.save("products",p)}}};
+  if(!rs(o.status)&&rs(ns))await adj(-1);else if(rs(o.status)&&!rs(ns))await adj(1);
+  o.status=ns;await D.save("orders",o);toast("Statut mis à jour")}
+});
+let pend=[];
+document.addEventListener("change",async e=>{if(e.target.id=="files"){pend=await Promise.all([...e.target.files].slice(0,3).map(shrink));$("#fl").textContent=pend.length+" nouvelle(s) photo(s) (remplace les anciennes)"}});
+document.addEventListener("submit",async e=>{
+ e.preventDefault();const f=e.target,d=Object.fromEntries(new FormData(f)),csv=s=>(s||"").split(",").map(x=>x.trim()).filter(Boolean);
+ try{
+ if(f.id=="of"){const bad=cart.find(l=>cart.filter(x=>x.id==l.id).reduce((a,x)=>a+x.qty,0)>((P.find(p=>p.id==l.id)||{}).stock??0));if(bad){toast("Stock insuffisant pour "+bad.name);return}
+  f.querySelector("button[type=submit]").disabled=true;const T=totals(),items=cart.map(l=>({...l})),o={name:d.name,phone:d.phone,addr:d.addr,pay:d.pay,items,sub:T.sub,discount:T.disc,code:promo?promo.code:"",total:T.total,status:"nouvelle",date:new Date().toISOString()};
+  const id=await D.save("orders",o);localStorage.setItem("last",JSON.stringify({...o,id}));cart=[];promo=null;localStorage.removeItem("promo");saveCart();location.hash="#/confirm/"+id}
+ else if(f.id=="tf")location.hash="#/track/"+encodeURIComponent(d.r.trim());
+ else if(f.id=="cdf"){await D.save("codes",{code:d.code.trim().toUpperCase(),pct:+d.pct});CODES=await D.list("codes");route()}
+ else if(f.id=="cf")open(`https://wa.me/${S.whatsapp}?text=${encodeURIComponent(d.n+" : "+d.m)}`);
+ else if(f.id=="lf"){if(LIVE)await auth.signInWithEmailAndPassword(d.e,d.p);else if(d.p=="admin123"){sessionStorage.demoAdmin=1;user={};route()}else toast("Mot de passe incorrect")}
+ else if(f.id=="pf"){const p=edit||{};const o={...p,name:d.name,category:d.category,price:+d.price,promo:+d.promo||0,stock:+d.stock||0,colors:csv(d.colors),sizes:csv(d.sizes),desc:d.desc,isNew:!!d.isNew,best:!!d.best,imgs:pend.length?pend:(p.imgs||[])};
+  await D.save("products",o);pend=[];edit=null;P=await D.list("products");toast("Produit enregistré");route()}
+ else if(f.id=="sf"){const bf=$("#bf").files[0];S={...S,...d};if(bf)S.banner=await shrink(bf);await D.save("settings",S);toast("Boutique mise à jour");route()}
+ }catch(err){document.querySelectorAll("button[type=submit]").forEach(b=>b.disabled=false);toast("Erreur : "+(err.code||err.message))}
+});
+
+document.addEventListener("input",e=>{if(e.target.id=="q"){q=e.target.value;$("#sg").innerHTML=shopList()}});
+document.addEventListener("change",e=>{if(e.target.id=="sort"){sort=e.target.value;$("#sg").innerHTML=shopList()}});
+window.addEventListener("error",e=>{const a=document.getElementById("app");if(a&&!a.innerHTML.trim())a.innerHTML='<div class="wrap"><h2>Oups</h2><p>'+esc(e.message)+'</p></div>'});
+(async()=>{try{await load()}catch(e){console.error(e);toast("Connexion Firebase impossible : "+(e.code||e.message))}route()})();

@@ -1,0 +1,16 @@
+{
+  "name": "Baya Élégance",
+  "short_name": "Baya",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0C0A09",
+  "theme_color": "#0C0A09",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "assets/img/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
