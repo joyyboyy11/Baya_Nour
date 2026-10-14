@@ -16,6 +16,9 @@ boutique-baya/
     └── img/              Images et favicon
 ```
 
+## Produits
+La boutique démarre **sans aucun produit**. Ajoute-les depuis `#/admin` > Produits > Ajouter un baya (nom, prix, stock, photos).
+
 ## Essayer tout de suite (mode démo)
 Ouvre `index.html` dans ton navigateur. Espace vendeuse : `#/admin`, mot de passe `admin123`.
 Les données sont stockées dans le navigateur uniquement.
