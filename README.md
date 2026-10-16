@@ -1,4 +1,4 @@
-# Boutique Baya Nour
+# Boutique Baya by Nour
 
 Site e-commerce pour une vendeuse de baya : boutique, panier, commande, suivi et espace vendeuse.
 
@@ -13,7 +13,7 @@ boutique-baya/
     ├── css/style.css     Design A « Bordeaux classique » (ivoire, bordeaux, détails dorés)
     ├── js/config.js      Configuration Firebase (à remplir)
     ├── js/app.js         Logique du site
-    └── img/              Logo (logo.svg, logo-rond.png), favicon et icônes
+    └── img/              Logos (logo-header, logo-full, logo-rond), favicon et icônes
 ```
 
 ## Produits
@@ -39,6 +39,8 @@ Les photos sont réduites (800 px) et enregistrées dans Firestore : Firebase St
 Nom, slogan, WhatsApp, Instagram, TikTok, numéro Wave, textes et bannière se modifient dans l'espace vendeuse, onglet Boutique.
 
 ## Logo
-- `assets/img/logo.svg` : logo horizontal (nom + fil de perles), texte converti en tracés, sans police à installer.
+- `assets/img/logo-header.png` : logo de l'en-tête (BAYA / BY NOUR) sur fond bordeaux.
+- `assets/img/logo-full.png` : logo complet (monogramme BN + nom) pour le pied de page.
 - `assets/img/logo-rond.png` (1024 px) : photo de profil pour Instagram, TikTok et WhatsApp.
-- L'en-tête affiche le nom saisi dans l'espace vendeuse (onglet Boutique) avec le fil de perles. En mode réel Firebase, vérifie que le champ « Nom de la boutique » contient bien « Baya Nour ».
+- `favicon.png` et `icon-*.png` : onglet du navigateur et écran d'accueil du téléphone.
+- Le nom affiché sur le site vient de l'espace vendeuse (onglet Boutique) : en mode réel Firebase, vérifie que le champ « Nom de la boutique » contient bien « Baya by Nour » (le site corrige automatiquement l'ancien « Baya Nour »).
