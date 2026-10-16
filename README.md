@@ -1,4 +1,4 @@
-# Boutique Baya
+# Boutique Baya Nour
 
 Site e-commerce pour une vendeuse de baya : boutique, panier, commande, suivi et espace vendeuse.
 
@@ -10,10 +10,10 @@ boutique-baya/
 ├── firebase.json         Déploiement Firebase Hosting
 ├── firestore.rules       Règles de sécurité Firestore
 └── assets/
-    ├── css/style.css     Design (clair : blanc et bordeaux)
+    ├── css/style.css     Design A « Bordeaux classique » (ivoire, bordeaux, détails dorés)
     ├── js/config.js      Configuration Firebase (à remplir)
     ├── js/app.js         Logique du site
-    └── img/              Images et favicon
+    └── img/              Logo (logo.svg, logo-rond.png), favicon et icônes
 ```
 
 ## Produits
@@ -37,3 +37,8 @@ Les photos sont réduites (800 px) et enregistrées dans Firestore : Firebase St
 
 ## Personnalisation
 Nom, slogan, WhatsApp, Instagram, TikTok, numéro Wave, textes et bannière se modifient dans l'espace vendeuse, onglet Boutique.
+
+## Logo
+- `assets/img/logo.svg` : logo horizontal (nom + fil de perles), texte converti en tracés, sans police à installer.
+- `assets/img/logo-rond.png` (1024 px) : photo de profil pour Instagram, TikTok et WhatsApp.
+- L'en-tête affiche le nom saisi dans l'espace vendeuse (onglet Boutique) avec le fil de perles. En mode réel Firebase, vérifie que le champ « Nom de la boutique » contient bien « Baya Nour ».
