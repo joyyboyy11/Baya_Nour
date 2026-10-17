@@ -1,4 +1,35 @@
 {
-  "hosting": { "public": ".", "ignore": ["firebase.json", "firestore.rules", "README.md", "**/.*"] },
-  "firestore": { "rules": "firestore.rules" }
+  "hosting": {
+    "public": ".",
+    "cleanUrls": true,
+    "ignore": [
+      "firebase.json",
+      "firestore.rules",
+      "README.md",
+      "**/.*"
+    ],
+    "headers": [
+      {
+        "source": "/admin",
+        "headers": [
+          {
+            "key": "X-Robots-Tag",
+            "value": "noindex, nofollow"
+          }
+        ]
+      },
+      {
+        "source": "/admin.html",
+        "headers": [
+          {
+            "key": "X-Robots-Tag",
+            "value": "noindex, nofollow"
+          }
+        ]
+      }
+    ]
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  }
 }

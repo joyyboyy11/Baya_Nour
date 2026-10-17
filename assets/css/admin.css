@@ -1,0 +1,6 @@
+/* Espace vendeuse (admin.html) : s'ajoute à style.css, qui fournit tableaux, boutons, champs et couleurs. */
+body.adm{background:var(--s1,#F8F6F3);min-height:100vh}
+body.adm header{justify-content:center}
+body.adm .wrap{padding-block:2.4rem}
+body.adm .mut{display:inline-block;margin:.4rem 0 .6rem;color:var(--mut,#6A635B);font-size:.9rem}
+body.adm .mut:hover{color:var(--acc,#8A2338)}
