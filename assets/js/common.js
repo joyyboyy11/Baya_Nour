@@ -22,7 +22,7 @@ const D={
   i<0?a.push({...o,id:nid}):a[i]={...o,id:nid};localStorage.setItem(c,JSON.stringify(a));return nid},
  async del(c,id){if(LIVE)return fdb.collection(c).doc(id).delete();localStorage.setItem(c,JSON.stringify(LS(c,[]).filter(x=>x.id!=id)))}
 };
-const DEF={id:"shop",name:"Baya by Nour",slogan:"Sublime ta féminité",whatsapp:"221768226801",instagram:"https://www.instagram.com/fatou_nour",tiktok:"https://tiktok.com/",wave:"77 000 00 00",banner:"",
+const DEF={id:"shop",name:"Baya by Nour",slogan:"L'art du baya, en toute élégance",whatsapp:"221768226801",instagram:"https://www.instagram.com/fatou_nour",tiktok:"https://tiktok.com/",wave:"77 000 00 00",banner:"",
  about:"Passionnée de baya depuis toujours, j'ai créé cette boutique pour offrir aux femmes sénégalaises des perles choisies avec soin, dans la tradition et avec une touche moderne.",
  values:"Authenticité, qualité des perles, service attentionné, livraison soignée."};
 let P=[],S={...DEF},CODES=[];
@@ -31,6 +31,6 @@ const pr=p=>p.promo>0&&p.promo<p.price?p.promo:p.price;
 async function load(){
  P=await D.list("products");
  CODES=await D.list("codes");
- const s=(await D.list("settings")).find(x=>x.id=="shop");S={...DEF,...(s||{}),id:"shop"};["name","slogan","about"].forEach(k=>{if(typeof S[k]=="string")S[k]=S[k].replace(/baya\s+nour/gi,"Baya by Nour")});
+ const s=(await D.list("settings")).find(x=>x.id=="shop");S={...DEF,...(s||{}),id:"shop"};["name","slogan","about"].forEach(k=>{if(typeof S[k]=="string")S[k]=S[k].replace(/baya\s+nour/gi,"Baya by Nour")});if(/sublime ta f.minit./i.test(S.slogan||""))S.slogan=DEF.slogan;
  if(!LIVE&&!LS("seeded",0)){await D.save("codes",{code:"BIENVENUE",pct:10});localStorage.setItem("seeded","1");CODES=await D.list("codes")}
 }
