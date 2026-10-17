@@ -13,7 +13,9 @@ function renderChrome(){
  $("#nav").innerHTML=[["go:produits","Produits"],["go:apropos","À propos"],["go:contact","Contact"],["#/fav","Favoris"+(fav.length?`<span class="cnt">${fav.length}</span>`:"")],["#/cart",`Panier${n?`<span class="cnt">${n}</span>`:""}`]].map(([u,t])=>u.startsWith("go:")?`<a href="#/" data-act="go" data-v="${u.slice(3)}">${t}</a>`:`<a href="${u}" class="${h==u?"on":""}">${t}</a>`).join("");
  $("#foot").innerHTML=`<div class="beads"></div><div class="fg"><div><p class="logo">${logoH(1)}</p><p style="margin-top:.8rem">${esc(S.slogan)}. Des baya choisies avec soin, livrées partout au Sénégal.</p></div><div><h3>Boutique</h3><a href="#/" data-act="go" data-v="produits">Tous les modèles</a><a href="#/" data-act="go" data-v="apropos">À propos</a><a href="#/" data-act="go" data-v="contact">Contact</a><a href="#/track">Suivi de commande</a></div><div><h3>Suivez-nous</h3><a href="https://wa.me/${esc(S.whatsapp)}">WhatsApp</a><a href="${esc(S.instagram)}">Instagram</a><a href="${esc(S.tiktok)}">TikTok</a></div></div><div class="mega" aria-hidden="true">${esc(S.name)}</div><p class="copy">© ${new Date().getFullYear()} ${esc(S.name)}</p>`;
  $("#fl").innerHTML=floatSocial();
- $("#tabbar").innerHTML=[["#/","Accueil"],["go:produits","Produits"],["#/fav","Favoris"+(fav.length?` (${fav.length})`:"")],["#/cart","Panier"+(n?` (${n})`:"")]].map(([u,t])=>u.startsWith("go:")?`<a href="#/" data-act="go" data-v="${u.slice(3)}">${t}</a>`:`<a href="${u}" class="${h==u?"on":""}">${t}</a>`).join("");
+ $("#dnav").innerHTML=[["#/","Accueil"],["go:produits","Produits"],["go:apropos","À propos"],["go:contact","Contact"],["#/fav","Favoris"+(fav.length?`<span class="cnt">${fav.length}</span>`:"")],["#/cart",`Panier${n?`<span class="cnt">${n}</span>`:""}`],["#/track","Suivi de commande"]].map(([u,t])=>u.startsWith("go:")?`<a href="#/" data-act="go" data-v="${u.slice(3)}">${t}</a>`:`<a href="${u}" class="${h==u?"on":""}">${t}</a>`).join("");
+ $("#dsoc").innerHTML=floatSocial();
+ const bc=$("#bcnt"),tot=n+fav.length;bc.textContent=tot;bc.hidden=!tot;
  document.title=S.name+", "+S.slogan;
 }
 const cardH=p=>`<a class="card" href="#/p/${p.id}">${p.promo>0?'<span class="tag">Promo</span>':p.isNew?'<span class="tag">Nouveau</span>':""}<button class="heart ${fav.includes(p.id)?"on":""}" data-act="fav" data-id="${p.id}" aria-label="Favori">&#9829;</button><div class="pic">${img(p)}<span class="qv">Voir le modèle</span></div><div class="b"><h3>${esc(p.name)}</h3><div class="price">${p.promo>0?`<s>${fmt(p.price)}</s>`:""}${fmt(pr(p))}</div>${p.stock<=0?'<small class="out">Épuisé</small>':""}</div></a>`;
@@ -127,3 +129,19 @@ window.addEventListener("error",e=>{const a=document.getElementById("app");if(a&
 (function(){const b=document.createElement("button");b.className="totop";b.type="button";b.setAttribute("aria-label","Retour en haut");b.innerHTML="&uarr;";b.onclick=()=>scrollTo({top:0,behavior:"smooth"});document.body.appendChild(b);addEventListener("scroll",()=>b.classList.toggle("show",scrollY>700),{passive:true})})();
 document.addEventListener("input",e=>{const i=e.target.id;if(i=="pmin"||i=="pmax"){const n=Math.max(0,+e.target.value||0);if(i=="pmin")pmin=n;else pmax=n;$("#sg")&&($("#sg").innerHTML=shopList())}});
 document.addEventListener("change",e=>{if(e.target.id=="fcol"){fcol=e.target.value;$("#sg")&&($("#sg").innerHTML=shopList())}});
+
+
+/* ===== Menu burger (mobile) ===== */
+function menu(o){
+ document.body.classList.toggle("menu-open",o);
+ $("#drawer").classList.toggle("open",o);$("#drawer").setAttribute("aria-hidden",!o);
+ $("#burger").setAttribute("aria-expanded",o);$("#burger").setAttribute("aria-label",o?"Fermer le menu":"Ouvrir le menu");
+ const ov=$("#ovl");if(o){ov.hidden=false;requestAnimationFrame(()=>ov.classList.add("open"))}else{ov.classList.remove("open");setTimeout(()=>{if(!document.body.classList.contains("menu-open"))ov.hidden=true},300)}
+}
+$("#burger").addEventListener("click",()=>menu(!document.body.classList.contains("menu-open")));
+$("#dclose").addEventListener("click",()=>menu(false));
+$("#ovl").addEventListener("click",()=>menu(false));
+$("#drawer").addEventListener("click",e=>{const a=e.target.closest("#dnav a");if(!a)return;menu(false);if(a.getAttribute("href")==="#/"&&!a.dataset.act&&(location.hash||"#/")==="#/")scrollTo({top:0,behavior:"smooth"})});
+addEventListener("keydown",e=>{if(e.key==="Escape")menu(false)});
+addEventListener("hashchange",()=>menu(false));
+matchMedia("(min-width:821px)").addEventListener("change",e=>{if(e.matches)menu(false)});
